@@ -4,7 +4,7 @@
  * The REST routes, the MCP tools and the dashboard all call this.
  */
 import { signJwt, verifyJwt, type SigningKey } from "./jwt.ts";
-import { Store } from "./db.ts";
+import { Store, id as makeId, type ProbeJob, type ProbeResult } from "./db.ts";
 import { fanOut, type Fetcher } from "./webhooks.ts";
 import {
   appId,
@@ -150,6 +150,72 @@ export class Hub {
     const kept: AppRecord = { ...previous, failures: previous.failures + 1, lastError: error };
     this.store.putApp(kept);
     return kept;
+  }
+
+  /** Up to this many URLs in one bulk job. */
+  static readonly BULK_LIMIT = 1000;
+  static readonly BULK_CONCURRENCY = 16;
+
+  /**
+   * Normalise a pasted list: one URL or bare domain per line or comma, https
+   * assumed, de-duplicated by host, at most BULK_LIMIT. Answers the URLs and
+   * the lines that were not URLs.
+   */
+  static parseBulk(text: string): { urls: string[]; rejected: string[] } {
+    const seen = new Set<string>();
+    const urls: string[] = [];
+    const rejected: string[] = [];
+    for (const raw of text.split(/[\s,]+/)) {
+      const line = raw.trim();
+      if (!line) continue;
+      const candidate = /^https?:\/\//i.test(line) ? line : `https://${line}`;
+      try {
+        const url = new URL(candidate);
+        const host = url.hostname.toLowerCase().replace(/^www\./, "");
+        if (!host.includes(".") || seen.has(host)) continue;
+        seen.add(host);
+        urls.push(url.origin);
+      } catch {
+        rejected.push(line);
+      }
+      if (urls.length >= Hub.BULK_LIMIT) break;
+    }
+    return { urls, rejected };
+  }
+
+  /**
+   * Probe many apps in the background. Answers the job at once; poll it. An
+   * app that answered is listed like any other registration, one that did not
+   * is a line in the results and nothing else.
+   */
+  bulkProbe(urls: string[]): ProbeJob {
+    const job = this.store.createJob(makeId("job", 8), urls.length);
+    const queue = [...urls];
+    const worker = async (): Promise<void> => {
+      for (;;) {
+        const url = queue.shift();
+        if (!url) return;
+        let outcome: ProbeResult;
+        try {
+          const record = await this.probeApp(url, this.store.getApp(appId(url)));
+          outcome = record.lastError ? { url, ok: false, id: record.id, error: record.lastError } : { url, ok: true, id: record.id, verified: record.verified, name: record.descriptor.name };
+        } catch (error) {
+          outcome = { url, ok: false, error: error instanceof HubError ? error.message : (error as Error).message };
+        }
+        job.results.push(outcome);
+        job.done++;
+        if (job.done === job.total) job.finishedAt = new Date().toISOString();
+        this.store.updateJob(job);
+      }
+    };
+    void Promise.all(Array.from({ length: Math.min(Hub.BULK_CONCURRENCY, urls.length) }, worker)).then(() => this.log(`bulk ${job.id}: ${job.results.filter((r) => r.ok).length}/${job.total} listed`));
+    return job;
+  }
+
+  job(jobId: string): ProbeJob {
+    const job = this.store.getJob(jobId);
+    if (!job) throw new HubError("unknown_job", "No such job.", 404);
+    return job;
   }
 
   app(appIdOrUrl: string): AppRecord {

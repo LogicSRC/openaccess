@@ -341,3 +341,25 @@ test("the dashboard renders subscriptions, links, agents and the forms; admin re
   assert.equal((await w.hubApp.request(`${HUB}/v1/apps/notes.example`, { method: "DELETE", headers: { authorization: "Bearer admin-secret" } })).status, 200);
   assert.equal(w.store.getApp("notes.example"), null);
 });
+
+test("bulk registration: a pasted list is normalised and probed in the background; the ones that answer are listed, the rest reported", async () => {
+  const w = await world();
+  const parsed = (await import("../src/hub.ts")).Hub.parseBulk("board.example\nhttps://notes.example/anything, www.board.example\nnowhere.example\nnot a url\n");
+  assert.deepEqual(parsed.urls, ["https://board.example", "https://notes.example", "https://nowhere.example"]);
+  assert.deepEqual(parsed.rejected, []);
+  const started = await w.hubApp.request(`${HUB}/v1/apps/bulk`, { method: "POST", headers: { "content-type": "text/plain" }, body: "board.example\nnotes.example\nnowhere.example" });
+  assert.equal(started.status, 202);
+  const { job } = (await started.json()) as { job: { id: string; total: number } };
+  assert.equal(job.total, 3);
+  let finished: { finishedAt: string | null; results: Array<{ url: string; ok: boolean; error?: string }> } = { finishedAt: null, results: [] };
+  for (let i = 0; i < 50 && !finished.finishedAt; i++) {
+    await settled();
+    finished = ((await (await w.hubApp.request(`${HUB}/v1/apps/bulk/${job.id}`)).json()) as { job: typeof finished }).job;
+  }
+  assert.ok(finished.finishedAt);
+  assert.deepEqual(finished.results.filter((r) => r.ok).map((r) => r.url).sort(), ["https://board.example", "https://notes.example"]);
+  assert.match(finished.results.find((r) => !r.ok)?.error ?? "", /nowhere.example/);
+  const html = await (await w.hubApp.request(`${HUB}/apps/bulk/${job.id}`, { headers: { accept: "text/html" } })).text();
+  assert.match(html, /2 listed, 1 without a descriptor/);
+  assert.equal((await w.hubApp.request(`${HUB}/v1/apps/bulk/nope`)).status, 404);
+});

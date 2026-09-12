@@ -11,6 +11,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { fromPrivateJwk, sha256url, signJwt, verifyBody, verifyJwt, type SigningKey } from "./jwt.ts";
 import type { AccessClaims, AppRecord, Entitlement, Grant, HubDescriptor, Jwk, Limits, Principal } from "./spec.ts";
+import type { ProbeJob } from "./db.ts";
 
 export { verifyBody as verifyWebhookSignature, verifyJwt } from "./jwt.ts";
 
@@ -268,6 +269,13 @@ export class OpenAccessClient {
   }
   registerApp(url: string): Promise<{ app: AppRecord }> {
     return this.call("POST", "/v1/apps", { url });
+  }
+  /** Register many at once. Answers a job; poll it with bulkJob until finishedAt is set. */
+  registerApps(urls: string[]): Promise<{ job: ProbeJob; rejected: string[]; page: string }> {
+    return this.call("POST", "/v1/apps/bulk", { urls });
+  }
+  bulkJob(id: string): Promise<{ job: ProbeJob }> {
+    return this.call("GET", `/v1/apps/bulk/${encodeURIComponent(id)}`);
   }
   refreshApp(id: string): Promise<{ app: AppRecord }> {
     return this.call("POST", `/v1/apps/${encodeURIComponent(id)}/refresh`);

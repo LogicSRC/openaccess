@@ -78,7 +78,7 @@ const HELP = `openaccess ${VERSION}: OAuth 2.1 with a grant you can carry.
   grants | grant <id> | revoke <id>             what you gave each app; revoke one and every child
   delegate --grant <id> --scope "a b" [--for <openprofile url>] [--per-call "5 USD"] [--per-day ..] [--lifetime ..] [--days 7]
   entitlements | cancel <id> | check <product>  what you pay for, wherever it is honoured
-  apps [q] | app add <url> | app show <id> | app refresh <id> | app rm <id> --token <admin>
+  apps [q] | app add <url> [more...] [--file list.txt] | app show|refresh|rm <id>
   keygen                                        an Ed25519 key for an app's descriptor
   descriptor <site url> [--name n] [--jwk file] a /.well-known/openaccess.json to start from
   report --key file --client-id id --sub oa_.. --product host/slug --status active [--end date] [--receipt url]
@@ -297,11 +297,28 @@ export async function main(argv: string[]): Promise<number> {
     }
     case "app": {
       const [sub, arg] = rest;
-      if (!arg) throw new Error("Usage: openaccess app add|show|refresh|rm <url or id>");
+      if (!arg && !(sub === "add" && str(flags, "file"))) throw new Error("Usage: openaccess app add <url> [more urls] [--file list.txt] | show|refresh|rm <id>");
       switch (sub) {
         case "add": {
-          const { app } = await client.registerApp(arg);
-          print(app, () => out(`${app.id}: ${app.verified ? "verified" : "unverified"}, ${Object.keys(app.descriptor.scopes ?? {}).length} scopes, ${(app.descriptor.offers ?? []).length} offers, honours ${(app.descriptor.honours ?? []).join(", ") || "nothing"}.`));
+          const file = str(flags, "file");
+          const many = [...rest.slice(1), ...(file ? readFileSync(file === "-" ? 0 : file, "utf8").split(/[\s,]+/) : [])].filter(Boolean);
+          if (!many.length) {
+            const { app } = await client.registerApp(arg);
+            print(app, () => out(`${app.id}: ${app.verified ? "verified" : "unverified"}, ${Object.keys(app.descriptor.scopes ?? {}).length} scopes, ${(app.descriptor.offers ?? []).length} offers, honours ${(app.descriptor.honours ?? []).join(", ") || "nothing"}.`));
+            return 0;
+          }
+          const started = await client.registerApps(many);
+          let job = started.job;
+          while (!job.finishedAt) {
+            await new Promise((r) => setTimeout(r, 2000));
+            job = (await client.bulkJob(job.id)).job;
+            if (!json) process.stderr.write(`\r${job.done}/${job.total} probed`);
+          }
+          if (!json) process.stderr.write("\n");
+          print(job, () => {
+            for (const r of job.results) out(`${r.ok ? "ok " : "no "} ${r.url.padEnd(40)} ${r.ok ? `${r.id} ${r.name ?? ""}` : r.error ?? ""}`);
+            out(`${job.results.filter((r) => r.ok).length} of ${job.total} listed${started.rejected.length ? `; not URLs: ${started.rejected.join(", ")}` : ""}.`);
+          });
           return 0;
         }
         case "show": {

@@ -59,6 +59,9 @@ create table if not exists deliveries (
   status integer, error text, attempts integer not null default 0
 );
 create index if not exists deliveries_app_idx on deliveries(app, at desc);
+create table if not exists probe_jobs (
+  id text primary key, created_at text not null, finished_at text, total integer not null, done integer not null default 0, results text not null
+);
 `;
 
 const now = (): string => new Date().toISOString();
@@ -419,6 +422,23 @@ export class Store {
     return entitlement;
   }
 
+  // --- bulk probe jobs ---------------------------------------------------------------
+
+  createJob(jobId: string, total: number): ProbeJob {
+    const job: ProbeJob = { id: jobId, createdAt: now(), finishedAt: null, total, done: 0, results: [] };
+    this.db.prepare("insert into probe_jobs (id, created_at, finished_at, total, done, results) values (?, ?, ?, ?, ?, ?)").run(job.id, job.createdAt, null, total, 0, "[]");
+    return job;
+  }
+
+  updateJob(job: ProbeJob): void {
+    this.db.prepare("update probe_jobs set finished_at = ?, done = ?, results = ? where id = ?").run(job.finishedAt, job.done, JSON.stringify(job.results), job.id);
+  }
+
+  getJob(jobId: string): ProbeJob | null {
+    const row = this.db.prepare("select * from probe_jobs where id = ?").get(jobId) as { id: string; created_at: string; finished_at: string | null; total: number; done: number; results: string } | undefined;
+    return row ? { id: row.id, createdAt: row.created_at, finishedAt: row.finished_at, total: Number(row.total), done: Number(row.done), results: JSON.parse(row.results) as ProbeResult[] } : null;
+  }
+
   // --- deliveries ---------------------------------------------------------------
 
   recordDelivery(input: { id: string; app: string; event: HubEvent; at: string; status: number | null; error: string | null; attempts: number }): void {
@@ -441,6 +461,25 @@ interface PrincipalRow {
   email: string | null;
   profile: string | null;
   created_at: string;
+}
+
+export interface ProbeResult {
+  url: string;
+  ok: boolean;
+  /** The app id when it was listed. */
+  id?: string;
+  verified?: boolean;
+  name?: string;
+  error?: string;
+}
+
+export interface ProbeJob {
+  id: string;
+  createdAt: string;
+  finishedAt: string | null;
+  total: number;
+  done: number;
+  results: ProbeResult[];
 }
 
 export interface DeviceRow {

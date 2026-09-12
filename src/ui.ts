@@ -159,7 +159,17 @@ export function appsPage(apps: AppRecord[], options: { csrf?: string; error?: st
         .join("")
     : `<p class="mute">No app yet.</p>`;
   return `<h1>Apps</h1><p class="mute">Every app this hub knows. An app is registered by URL; the hub reads its descriptor from its own origin and lists what it found.</p>
-<form method="post" action="/ui/apps" style="display:block"><input type="hidden" name="csrf" value="${esc(options.csrf ?? "")}"><input name="url" placeholder="https://app.example" style="width:60%"> <button>Register</button></form>${options.error ? `<p style="color:var(--danger)">${esc(options.error)}</p>` : ""}${list}`;
+<form method="post" action="/ui/apps" style="display:block"><input type="hidden" name="csrf" value="${esc(options.csrf ?? "")}"><input name="url" placeholder="https://app.example" style="width:60%"> <button>Register</button></form>${options.error ? `<p style="color:var(--danger)">${esc(options.error)}</p>` : ""}
+<details><summary>Register many at once (up to 1,000 domains)</summary><form method="post" action="/ui/apps/bulk" style="display:block" class="card"><input type="hidden" name="csrf" value="${esc(options.csrf ?? "")}"><textarea name="urls" rows="8" style="width:100%;font:13px ui-monospace,monospace" placeholder="one domain or URL per line, or comma-separated"></textarea><p class="mute">Each is probed for /.well-known/openaccess.json on its own origin. Those that answer are listed; the rest are reported and nothing else happens.</p><button>Probe and register</button></form></details>${list}`;
+}
+
+export function bulkPage(job: { id: string; total: number; done: number; finishedAt: string | null; results: Array<{ url: string; ok: boolean; id?: string; verified?: boolean; name?: string; error?: string }> }): string {
+  const listed = job.results.filter((r) => r.ok);
+  const failed = job.results.filter((r) => !r.ok);
+  const rows = [...listed, ...failed].map((r) => `<tr><td>${r.ok ? `<a href="/apps/${esc(r.id)}">${esc(r.name ?? r.id)}</a>` : esc(r.url)}</td><td>${r.ok ? '<span class="pill good">listed</span>' : '<span class="pill bad">no descriptor</span>'}</td><td class="mute">${esc(r.error ?? r.url)}</td></tr>`).join("");
+  return `${job.finishedAt ? "" : '<meta http-equiv="refresh" content="3">'}<h1>Bulk registration</h1><p class="mute">Job <code>${esc(job.id)}</code> · ${job.done} of ${job.total} probed${job.finishedAt ? "" : ", refreshing"} · ${listed.length} listed, ${failed.length} without a descriptor</p>
+<table style="width:100%;border-collapse:collapse"><thead><tr><th align="left">App</th><th align="left">Result</th><th align="left">Detail</th></tr></thead><tbody>${rows}</tbody></table>
+<p><a href="/apps">Back to the apps</a> · <a href="/v1/apps/bulk/${esc(job.id)}">JSON</a></p>`;
 }
 
 export function appPage(app: AppRecord): string {

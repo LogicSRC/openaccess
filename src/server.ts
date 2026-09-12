@@ -17,9 +17,9 @@ import { logMailer, type Mailer } from "./mail.ts";
 import { TOOLS, callTool } from "./mcp/tools.ts";
 import { PROTOCOL_VERSION, failure, isNotification, isRequest, result, INVALID_PARAMS, METHOD_NOT_FOUND, PARSE_ERROR, INTERNAL_ERROR } from "./mcp/protocol.ts";
 import { OPENACCESS_VERSION, RESERVED_SCOPES, parseScope, type AppRecord, type Grant, type HubDescriptor, type Principal } from "./spec.ts";
-import { appPage, appsPage, consentPage, dashboardPage, devicePage, esc, layout, signInPage } from "./ui.ts";
+import { appPage, appsPage, bulkPage, consentPage, dashboardPage, devicePage, esc, layout, signInPage } from "./ui.ts";
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";
 const SESSION_COOKIE = "oa_session";
 const ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
 
@@ -172,6 +172,7 @@ export function createApp(options: ServerOptions): Hono & { hub: Hub } {
           "GET  /v1/entitlements | POST /v1/entitlements (seller, private_key_jwt) | POST /v1/entitlements/:id/cancel",
           "GET  /v1/check?product=&sub=",
           "GET  /v1/apps?q= | POST /v1/apps {url} | GET /v1/apps/:id | POST /v1/apps/:id/refresh | DELETE /v1/apps/:id (admin)",
+          "POST /v1/apps/bulk {urls: [...]} or text/plain, up to 1000 | GET /v1/apps/bulk/:job",
           "DELETE /v1/links/:app",
           "POST /mcp",
         ],
@@ -576,6 +577,32 @@ export function createApp(options: ServerOptions): Hono & { hub: Hub } {
     }
   });
 
+  /** Many at once: JSON {urls: [...]} or a text/plain list. Answers a job to poll. */
+  app.post("/v1/apps/bulk", async (c) => {
+    try {
+      const type = c.req.header("content-type") ?? "";
+      let text = "";
+      if (type.includes("application/json")) {
+        const body = (await c.req.json().catch(() => ({}))) as { urls?: unknown; text?: unknown };
+        text = Array.isArray(body.urls) ? body.urls.filter((u): u is string => typeof u === "string").join("\n") : typeof body.text === "string" ? body.text : "";
+      } else text = await c.req.text();
+      const parsed = Hub.parseBulk(text);
+      if (!parsed.urls.length) throw new HubError("invalid_request", "Send {urls: [...]} or a text list, one domain or URL per line.");
+      const job = hub.bulkProbe(parsed.urls);
+      return c.json({ ok: true, job, rejected: parsed.rejected, poll: `${url}/v1/apps/bulk/${job.id}`, page: `${url}/apps/bulk/${job.id}` }, 202);
+    } catch (error) {
+      return apiError(c, error);
+    }
+  });
+
+  app.get("/v1/apps/bulk/:job", (c) => {
+    try {
+      return c.json({ ok: true, job: hub.job(c.req.param("job")) });
+    } catch (error) {
+      return apiError(c, error);
+    }
+  });
+
   app.get("/v1/apps/:id", (c) => {
     const record = store.getApp(c.req.param("id"));
     return record ? c.json({ ok: true, app: record }) : c.json({ ok: false, error: "unknown_app" }, 404);
@@ -642,6 +669,21 @@ export function createApp(options: ServerOptions): Hono & { hub: Hub } {
   app.get("/apps", (c) => {
     const session = getCookie(c, SESSION_COOKIE);
     return page(c, "Apps", appsPage(store.listApps(), { csrf: session ? csrfOf(session) : "", error: c.req.query("error") }), store.sessionPrincipal(session));
+  });
+  app.get("/apps/bulk/:job", (c) => {
+    try {
+      return page(c, "Bulk registration", bulkPage(hub.job(c.req.param("job"))), store.sessionPrincipal(getCookie(c, SESSION_COOKIE)));
+    } catch {
+      return c.notFound();
+    }
+  });
+  app.post("/ui/apps/bulk", async (c) => {
+    const ok = await csrfOk(c);
+    if (!ok) return c.redirect("/auth");
+    const parsed = Hub.parseBulk(ok.body.urls ?? "");
+    if (!parsed.urls.length) return c.redirect(`/apps?error=${encodeURIComponent("Paste at least one domain.")}`);
+    const job = hub.bulkProbe(parsed.urls);
+    return c.redirect(`/apps/bulk/${job.id}`);
   });
   app.get("/apps/:id", (c) => {
     const record = store.getApp(c.req.param("id"));
