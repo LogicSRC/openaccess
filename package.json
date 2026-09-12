@@ -1,0 +1,29 @@
+{
+  "name": "@logicsrc/openaccess",
+  "version": "0.1.0",
+  "description": "OpenAccess: OAuth 2.1 with a grant you can carry. A reference hub that keeps grants and entitlements for people and agents across every app they use, and a client and CLI for apps and terminals.",
+  "license": "MIT",
+  "type": "module",
+  "homepage": "https://logicsrc.com/openaccess",
+  "repository": { "type": "git", "url": "git+https://github.com/logicsrc/openaccess.git" },
+  "bin": { "openaccess": "bin/openaccess.mjs" },
+  "main": "dist/index.js",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./client": { "types": "./dist/client.d.ts", "default": "./dist/client.js" },
+    "./server": { "types": "./dist/server.d.ts", "default": "./dist/server.js" }
+  },
+  "files": ["bin", "dist", "src", "docs", "README.md", "LICENSE"],
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node bin/openaccess.mjs serve",
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "dependencies": { "@hono/node-server": "^2.1.1", "hono": "^4.13.7" },
+  "devDependencies": { "@types/node": "^24.0.0", "typescript": "^5.9.0" },
+  "keywords": ["oauth", "oauth2.1", "authorization", "entitlements", "subscriptions", "permissions", "agents", "mcp", "logicsrc"],
+  "types": "dist/index.d.ts"
+}
