@@ -1,6 +1,6 @@
 {
   "name": "@logicsrc/openaccess",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "OpenAccess: OAuth 2.1 with a grant you can carry. A reference hub that keeps grants and entitlements for people and agents across every app they use, and a client and CLI for apps and terminals.",
   "license": "MIT",
   "type": "module",
@@ -47,6 +47,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",
+    "@profullstack/footer": "^0.2.6",
     "hono": "^4.13.7"
   },
   "devDependencies": {
