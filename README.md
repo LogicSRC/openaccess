@@ -21,6 +21,8 @@ npx @logicsrc/openaccess serve --port 8791 --url https://hub.example --admin-tok
 
 Node 24 or later, one SQLite file (`--db`), no build step. `OPENACCESS_URL`, `OPENACCESS_DB`, `OPENACCESS_ADMIN_TOKEN`, `OPENACCESS_NAME`, `OPENACCESS_OPERATOR` (an OpenProfile.md URL), `RESEND_API_KEY` and `MAIL_FROM` (sign-in mail; without a key the link is logged), and `OPENACCESS_REFRESH_MINUTES` (30) do the same from the environment. The signing key is made on first run and kept in the database.
 
+`PROFULLSTACK_FOOTER=1` adds the Profullstack network footer ([@profullstack/footer](https://github.com/profullstack/footer): webring row, built.indie and pwamart badges) to every HTML page and serves `/.well-known/openwebring.json`. Off by default; leave it off on a hub that is not part of that network.
+
 The `Dockerfile` and `railway.json` deploy it as one service with a volume at `/data`.
 
 ## Use one from a terminal

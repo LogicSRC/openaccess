@@ -18,8 +18,9 @@ import { TOOLS, callTool } from "./mcp/tools.ts";
 import { PROTOCOL_VERSION, failure, isNotification, isRequest, result, INVALID_PARAMS, METHOD_NOT_FOUND, PARSE_ERROR, INTERNAL_ERROR } from "./mcp/protocol.ts";
 import { OPENACCESS_VERSION, RESERVED_SCOPES, parseScope, type AppRecord, type Grant, type HubDescriptor, type Principal } from "./spec.ts";
 import { appPage, appsPage, bulkPage, consentPage, dashboardPage, devicePage, esc, landingPage, layout, signInPage } from "./ui.ts";
+import { ringDescriptor, ringFooter } from "./ring-footer.ts";
 
-export const VERSION = "0.3.0";
+export const VERSION = "0.3.1";
 const SESSION_COOKIE = "oa_session";
 const ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
 
@@ -116,7 +117,7 @@ export function createApp(options: ServerOptions): Hono & { hub: Hub } {
 
   const page = (c: Context, title: string, body: string, principal?: Principal | null): Response => {
     const session = getCookie(c, SESSION_COOKIE);
-    return c.html(layout(title, body, { hubName: hub.name, principal, csrf: session ? csrfOf(session) : "" }));
+    return c.html(layout(title, body, { hubName: hub.name, principal, csrf: session ? csrfOf(session) : "", footer: ringFooter(`${url}/`) }));
   };
   const oauthError = (c: Context, error: HubError): Response => c.json({ error: error.code, error_description: error.message }, error.status as 400);
   const apiError = (c: Context, error: unknown): Response => {
@@ -147,6 +148,7 @@ export function createApp(options: ServerOptions): Hono & { hub: Hub } {
   // --- well-known and index ---------------------------------------------------------------
 
   app.get("/.well-known/openaccess.json", (c) => c.json(descriptor()));
+  app.get("/.well-known/openwebring.json", (c) => ringDescriptor(`${url}/`, hub.name) ?? c.json({ ok: false, error: "Not found" }, 404));
   app.get("/.well-known/oauth-authorization-server", (c) => c.json(descriptor()));
   app.get("/.well-known/jwks.json", (c) => c.json({ keys: [key.jwk] }));
   app.get("/healthz", (c) => c.json({ ok: true, version: VERSION, apps: store.countApps(), principals: store.countPrincipals() }));

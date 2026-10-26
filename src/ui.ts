@@ -47,7 +47,7 @@ details summary{cursor:pointer;color:var(--mute);font-size:14px}details[open] su
 .cta{display:flex;gap:.7rem;flex-wrap:wrap;margin-top:1.4rem;align-items:center}.cta a.plain{color:var(--mute);font-size:14px;margin-left:.3rem}
 .stats{display:flex;gap:2rem;flex-wrap:wrap;margin-top:2rem;color:var(--mute);font-size:14px}.stats strong{display:block;font:600 1.5rem var(--display);color:var(--fg);letter-spacing:-.02em}
 table.t{width:100%;border-collapse:collapse;font-size:14px}table.t th{text-align:left;color:var(--mute);font-weight:500;padding:.5rem .6rem;border-bottom:1px solid var(--line)}table.t td{padding:.6rem;border-bottom:1px solid var(--line);vertical-align:top}
-footer{border-top:1px solid var(--line);color:var(--mute);font-size:13px;padding:1.5rem 0}footer .wrap{display:flex;gap:1.2rem;flex-wrap:wrap;justify-content:space-between}footer a{color:var(--mute)}
+footer.pfs-footer{padding:0}footer{border-top:1px solid var(--line);color:var(--mute);font-size:13px;padding:1.5rem 0}footer .wrap{display:flex;gap:1.2rem;flex-wrap:wrap;justify-content:space-between}footer a{color:var(--mute)}
 ul.plain{list-style:none;padding:0;margin:.3rem 0}ul.plain li{margin:.2rem 0}
 `;
 
@@ -64,13 +64,15 @@ export interface LayoutOptions {
   csrf?: string;
   /** Page-level description for the head. */
   description?: string;
+  /** Extra HTML after the site footer: the Profullstack network footer when it is on. */
+  footer?: string;
 }
 
 export function layout(title: string, body: string, options: LayoutOptions): string {
   const nav = options.principal
     ? `<nav class="top"><a href="/">Dashboard</a><a href="/apps">Apps</a><a href="https://logicsrc.com/openaccess">Spec</a><form method="post" action="/auth/signout"><input type="hidden" name="csrf" value="${esc(options.csrf ?? "")}"><button class="quiet" style="padding:.35rem .7rem;font-size:13px">Sign out</button></form></nav>`
     : `<nav class="top"><a href="/apps">Apps</a><a href="https://logicsrc.com/openaccess">Spec</a><a href="https://github.com/logicsrc/openaccess">GitHub</a><a class="btn" style="padding:.4rem .85rem;font-size:13px" href="/auth">Sign in</a></nav>`;
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} · ${esc(options.hubName)}</title><meta name="description" content="${esc(options.description ?? "OAuth 2.1 with a grant you can carry. One account, every app you use, and the subscriptions you paid for, honoured wherever they are honoured.")}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono&display=swap"><style>${CSS}</style></head><body><header class="top"><div class="wrap"><a class="brand" href="/">${LOGO}${esc(options.hubName)}<small>by LogicSRC</small></a>${nav}</div></header><main><div class="wrap">${body}</div></main><footer><div class="wrap"><span>An open standard. Spec CC BY 4.0, reference hub MIT.</span><span><a href="https://logicsrc.com/openaccess">Specification</a> · <a href="https://github.com/logicsrc/openaccess">Source</a> · <a href="https://www.npmjs.com/package/@logicsrc/openaccess">npm</a> · <a href="https://openmcp.logicsrc.com/">OpenMCP catalog</a> · <a href="/.well-known/openaccess.json">Descriptor</a></span></div></footer></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} · ${esc(options.hubName)}</title><meta name="description" content="${esc(options.description ?? "OAuth 2.1 with a grant you can carry. One account, every app you use, and the subscriptions you paid for, honoured wherever they are honoured.")}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono&display=swap"><style>${CSS}</style></head><body><header class="top"><div class="wrap"><a class="brand" href="/">${LOGO}${esc(options.hubName)}<small>by LogicSRC</small></a>${nav}</div></header><main><div class="wrap">${body}</div></main><footer><div class="wrap"><span>An open standard. Spec CC BY 4.0, reference hub MIT.</span><span><a href="https://logicsrc.com/openaccess">Specification</a> · <a href="https://github.com/logicsrc/openaccess">Source</a> · <a href="https://www.npmjs.com/package/@logicsrc/openaccess">npm</a> · <a href="https://openmcp.logicsrc.com/">OpenMCP catalog</a> · <a href="/.well-known/openaccess.json">Descriptor</a></span></div></footer>${options.footer ?? ""}</body></html>`;
 }
 
 export function landingPage(input: { apps: number; principals: number; hubUrl: string }): string {
