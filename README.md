@@ -33,7 +33,7 @@ openaccess me                                            # apps, grants, entitle
 openaccess delegate --grant g_… --scope "jobs:read" --for https://bot.example/.well-known/openprofile.md --per-day "50 USD" --days 7
 openaccess revoke g_…                                    # and every child under it
 openaccess cancel e_…                                    # the seller hears; its cancel link comes back
-openaccess app add https://agenticjobs.work              # register by any URL on the app
+openaccess app add https://agenticjobs.pwa.pit.world              # register by any URL on the app
 ```
 
 ## Adopt it in an app
