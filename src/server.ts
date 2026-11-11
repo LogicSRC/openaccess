@@ -20,7 +20,7 @@ import { OPENACCESS_VERSION, RESERVED_SCOPES, parseScope, type AppRecord, type G
 import { appPage, appsPage, bulkPage, consentPage, dashboardPage, devicePage, esc, landingPage, layout, signInPage } from "./ui.ts";
 import { ringDescriptor, ringFooter } from "./ring-footer.ts";
 
-export const VERSION = "0.3.1";
+export const VERSION = "0.3.2";
 const SESSION_COOKIE = "oa_session";
 const ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
 

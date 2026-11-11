@@ -21,12 +21,13 @@ const object = (properties: Record<string, unknown>, required: string[] = []): R
 const string = (description: string): Record<string, unknown> => ({ type: "string", description });
 
 export const TOOLS: ToolDefinition[] = [
-  { name: "whoami", title: "Who am I", description: "The principal behind the token, the grant it rides on, and its scopes and limits.", inputSchema: object({}) },
-  { name: "my_grants", title: "My grants", description: "Every grant the principal gave, per app, with children delegated to agents.", inputSchema: object({ app: string("Only this app, by id.") }) },
-  { name: "my_entitlements", title: "My entitlements", description: "Every product the principal holds, with pay, cancel, manage and promote links filled in, and which apps honour each.", inputSchema: object({}) },
+  { name: "whoami", title: "Who Am I", annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true }, description: "The principal behind the token, the grant it rides on, and its scopes and limits.", inputSchema: object({}) },
+  { name: "my_grants", title: "My Grants", annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true }, description: "Every grant the principal gave, per app, with children delegated to agents.", inputSchema: object({ app: string("Only this app, by id.") }) },
+  { name: "my_entitlements", title: "My Entitlements", annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true }, description: "Every product the principal holds, with pay, cancel, manage and promote links filled in, and which apps honour each.", inputSchema: object({}) },
   {
     name: "delegate_grant",
-    title: "Delegate a grant",
+    title: "Delegate Grant",
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description: "Hand a narrower grant to an agent: a subset of this token's scopes, limits no larger, an expiry no later. Answers a refresh token for the agent, shown once.",
     inputSchema: object(
       {
@@ -41,12 +42,12 @@ export const TOOLS: ToolDefinition[] = [
       ["scope"],
     ),
   },
-  { name: "revoke_grant", title: "Revoke a grant", description: "Revoke one of the principal's grants and every child delegated from it. The app hears at once.", inputSchema: object({ id: string("The grant id.") }, ["id"]) },
-  { name: "cancel_entitlement", title: "Cancel a subscription", description: "Ask the seller to cancel. The standing stays until the seller reports the cancellation; the seller's cancel link comes back too.", inputSchema: object({ id: string("The entitlement id, from my_entitlements.") }, ["id"]) },
-  { name: "check_entitlement", title: "Check an entitlement", description: "Does the principal hold this product in good standing.", inputSchema: object({ product: string("<host>/<slug>") }, ["product"]) },
-  { name: "list_apps", title: "List apps", description: "The apps this hub knows: their scopes, what they sell, what they honour.", inputSchema: object({ q: string("A word to match.") }) },
-  { name: "get_app", title: "Get an app", description: "One app in full: its descriptor as the hub last read it.", inputSchema: object({ id: string("The app id: its host.") }, ["id"]) },
-  { name: "register_app", title: "Register an app", description: "Register an app by any URL on its origin. The hub reads /.well-known/openaccess.json there and lists what it found.", inputSchema: object({ url: string("The app's URL.") }, ["url"]) },
+  { name: "revoke_grant", title: "Revoke Grant", annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, idempotentHint: true }, description: "Revoke one of the principal's grants and every child delegated from it. The app hears at once.", inputSchema: object({ id: string("The grant id.") }, ["id"]) },
+  { name: "cancel_entitlement", title: "Cancel Subscription", annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true, idempotentHint: true }, description: "Ask the seller to cancel. The standing stays until the seller reports the cancellation; the seller's cancel link comes back too.", inputSchema: object({ id: string("The entitlement id, from my_entitlements.") }, ["id"]) },
+  { name: "check_entitlement", title: "Check Entitlement", annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true }, description: "Does the principal hold this product in good standing.", inputSchema: object({ product: string("<host>/<slug>") }, ["product"]) },
+  { name: "list_apps", title: "List Apps", annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true }, description: "The apps this hub knows: their scopes, what they sell, what they honour.", inputSchema: object({ q: string("A word to match.") }) },
+  { name: "get_app", title: "Get App", annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true }, description: "One app in full: its descriptor as the hub last read it.", inputSchema: object({ id: string("The app id: its host.") }, ["id"]) },
+  { name: "register_app", title: "Register App", annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: true }, description: "Register an app by any URL on its origin. The hub reads /.well-known/openaccess.json there and lists what it found.", inputSchema: object({ url: string("The app's URL.") }, ["url"]) },
 ];
 
 const needActor = (ctx: ToolContext): NonNullable<ToolContext["actor"]> => {
