@@ -20,7 +20,7 @@ import { OPENACCESS_VERSION, RESERVED_SCOPES, parseScope, type AppRecord, type G
 import { appPage, appsPage, bulkPage, consentPage, dashboardPage, devicePage, esc, landingPage, layout, signInPage } from "./ui.ts";
 import { ringDescriptor, ringFooter } from "./ring-footer.ts";
 
-export const VERSION = "0.3.2";
+export const VERSION = "0.3.3";
 const SESSION_COOKIE = "oa_session";
 const ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
 
@@ -151,7 +151,17 @@ export function createApp(options: ServerOptions): Hono & { hub: Hub } {
   app.get("/.well-known/openwebring.json", (c) => ringDescriptor(`${url}/`, hub.name) ?? c.json({ ok: false, error: "Not found" }, 404));
   app.get("/.well-known/oauth-authorization-server", (c) => c.json(descriptor()));
   app.get("/.well-known/jwks.json", (c) => c.json({ keys: [key.jwk] }));
-  app.get("/healthz", (c) => c.json({ ok: true, version: VERSION, apps: store.countApps(), principals: store.countPrincipals() }));
+  // --- crawlers: the public pages (landing, sign-in, the app directory and each app) on the hub's own origin
+  app.get("/robots.txt", (c) =>
+    c.body(
+      ["User-agent: *", "Allow: /", "Disallow: /v1/", "Disallow: /mcp", "Disallow: /authorize", "Disallow: /auth/verify", "Disallow: /device/verify", "Disallow: /ui/", "", `Sitemap: ${url}/sitemap.xml`, ""].join("\n"),
+      200,
+      { "content-type": "text/plain; charset=utf-8", "cache-control": "public, max-age=3600" },
+    ),
+  );
+  app.get("/sitemap.xml", (c) => c.body(sitemapXml(url, store.listApps()), 200, { "content-type": "application/xml; charset=utf-8", "cache-control": "public, max-age=3600" }));
+
+  app.get("/healthz",(c) => c.json({ ok: true, version: VERSION, apps: store.countApps(), principals: store.countPrincipals() }));
 
   app.get("/", (c) => {
     const actor = selfActor(c);
@@ -745,6 +755,26 @@ export interface ServeOptions extends ServerOptions {
 }
 
 /** Start listening, with the refresh job on its timer. Returns a stop function. */
+const xmlEscape = (value: string): string => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/** The hub's sitemap: its public pages and one page per registered app, every URL on `origin`. */
+export function sitemapXml(origin: string, apps: AppRecord[]): string {
+  const day = (value: string | null | undefined): string | null => {
+    const date = value ? new Date(value) : null;
+    return date && !Number.isNaN(date.getTime()) ? date.toISOString().slice(0, 10) : null;
+  };
+  const newest = apps.map((a) => a.seenAt ?? a.firstSeenAt).filter(Boolean).sort().pop() ?? null;
+  const entries: Array<{ loc: string; lastmod: string | null }> = [
+    { loc: `${origin}/`, lastmod: day(newest) },
+    { loc: `${origin}/apps`, lastmod: day(newest) },
+    { loc: `${origin}/auth`, lastmod: null },
+    { loc: `${origin}/device`, lastmod: null },
+    ...apps.map((a) => ({ loc: `${origin}/apps/${encodeURIComponent(a.id)}`, lastmod: day(a.seenAt ?? a.firstSeenAt) })),
+  ];
+  const urls = entries.map((e) => `  <url><loc>${xmlEscape(e.loc)}</loc>${e.lastmod ? `<lastmod>${e.lastmod}</lastmod>` : ""}</url>`).join("\n");
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+}
+
 export function serve(options: ServeOptions): { app: Hono & { hub: Hub }; stop: () => void } {
   const app = createApp(options);
   const server = nodeServe({ fetch: app.fetch, port: options.port });
